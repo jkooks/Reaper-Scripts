@@ -21,15 +21,15 @@ This script is meant to sort all items equally in the given time selection.
 ##### Smart Track Creator
 This script is used to make a track at any depth level after the selected track. The following are instructions to use this tool, and they are also in the script if you need a refresher on how to use it.
 
-Situations:
-	If no tracks is selected = create a track at the end of the track count
-	If one track is selected:
-		If it is a "base level track" (i.e. not parented) = create another base level track
-		If it is the end of a folder = create a base level track/normal track within the overarching folder structure (if there is one)
-		If it is within a folder structure = create another track within that structure
-	If multiple tracks selected:
-		If the last track selected is the end of the folder structure:
-			If the first track selected is within the same folder structure/the parent of it = create a track and make it the new end of that structure
-			If the first track is a "grandparent"/part of an overarching folder structure = create a track and make it the end of that folder if there isn't one already
-			Otherwise add it as a base level track
-		If it is not the end of the folder structure = create a track within that folder
+###### Situations
+If no tracks is selected = create a track at the end of the track count
+If one track is selected:
+	If it is a "base level track" (i.e. not parented) = create another base level track
+	If it is the end of a folder = create a base level track/normal track within the overarching folder structure (if there is one)
+	If it is within a folder structure = create another track within that structure
+If multiple tracks selected:
+	If the last track selected is the end of the folder structure:
+		If the first track selected is within the same folder structure/the parent of it = create a track and make it the new end of that structure
+		If the first track is a "grandparent"/part of an overarching folder structure = create a track and make it the end of that folder if there isn't one already
+		Otherwise add it as a base level track
+	If it is not the end of the folder structure = create a track within that folder
