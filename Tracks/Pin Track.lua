@@ -204,10 +204,15 @@ end
 --MAIN--
 --------
 
-track = reaper.GetSelectedTrack(0, 0)
+function Main()
+    track = reaper.GetSelectedTrack(0, 0)
 
---only start if there is a track selected
-if track then
+    --only start if there is a track selected
+    if not track then
+        reaper.defer(function() end)
+        return false
+    end
+
     track_string = tostring(track)
 
     init_index = GetTrackIndex(track)
@@ -252,3 +257,5 @@ if track then
     GetScrollLevel() --start the defer loop
     reaper.atexit(OnTerminate) --reset everything on termination
 end
+
+Main()
