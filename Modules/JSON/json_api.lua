@@ -174,7 +174,7 @@ function json.Decode(info, is_zero)
 
     local f_str_ctrl_pat = '[\0-\31]'
 
-    local f_str_escapetbl = {
+    local escape_table = {
         ['"']  = '"',
         ['\\'] = '\\',
         ['/']  = '/',
@@ -188,7 +188,7 @@ function json.Decode(info, is_zero)
         end
     }
 
-    setmetatable(f_str_escapetbl, f_str_escapetbl)
+    setmetatable(escape_table, escape_table)
 
 
     --returnns the json line number that the decoder errored on
@@ -205,82 +205,99 @@ function json.Decode(info, is_zero)
     end
 
 
-    local f_str_surrogate_prev = 0
-    local function StringSubstitute(ch, ucode)
+    local formatted_preview = 0
+
+
+    local function StringSubstitute(ch, uni_code)
+        --formats and decodes strings appropriately -  thank you to retorquere's zotero.lua for the code
+
         if ch == 'u' then
-            local c1, c2, c3, c4, rest = string.byte(ucode, 1, 5)
-            ucode = f_str_hextbl[c1-47] * 0x1000 +
-                    f_str_hextbl[c2-47] * 0x100 +
-                    f_str_hextbl[c3-47] * 0x10 +
-                    f_str_hextbl[c4-47]
-            if ucode ~= inf then
-                if ucode < 0x80 then  -- 1byte
-                    if rest then
-                        return string.char(ucode, rest)
+            local char_1, char_2, char_3, char_4, leftovers = string.byte(uni_code, 1, 5)
+            uni_code = formatted_hex[char_1-47] * 0x1000 +
+                    formatted_hex[char_2-47] * 0x100 +
+                    formatted_hex[char_3-47] * 0x10 +
+                    formatted_hex[char_4-47]
+            if uni_code ~= inf then
+                if uni_code < 0x80 then  -- 1byte
+                    if leftovers then
+                        return string.char(uni_code, leftovers)
                     end
-                    return string.char(ucode)
-                elseif ucode < 0x800 then  -- 2bytes
-                    c1 = math.floor(ucode / 0x40)
-                    c2 = ucode - c1 * 0x40
-                    c1 = c1 + 0xC0
-                    c2 = c2 + 0x80
-                    if rest then
-                        return string.char(c1, c2, rest)
+                    return string.char(uni_code)
+
+                elseif uni_code < 0x800 then  -- 2bytes
+                    char_1 = math.floor(uni_code / 0x40)
+                    char_2 = uni_code - char_1 * 0x40
+                    char_1 = char_1 + 0xC0
+                    char_2 = char_2 + 0x80
+                    if leftovers then
+                        return string.char(char_1, char_2, leftovers)
                     end
-                    return string.char(c1, c2)
-                elseif ucode < 0xD800 or 0xE000 <= ucode then  -- 3bytes
-                    c1 = math.floor(ucode / 0x1000)
-                    ucode = ucode - c1 * 0x1000
-                    c2 = math.floor(ucode / 0x40)
-                    c3 = ucode - c2 * 0x40
-                    c1 = c1 + 0xE0
-                    c2 = c2 + 0x80
-                    c3 = c3 + 0x80
-                    if rest then
-                        return string.char(c1, c2, c3, rest)
+                    return string.char(char_1, char_2)
+
+                elseif uni_code < 0xD800 or 0xE000 <= uni_code then  -- 3bytes
+                    char_1 = math.floor(uni_code / 0x1000)
+                    uni_code = uni_code - char_1 * 0x1000
+                    char_2 = math.floor(uni_code / 0x40)
+                    char_3 = uni_code - char_2 * 0x40
+                    char_1 = char_1 + 0xE0
+                    char_2 = char_2 + 0x80
+                    char_3 = char_3 + 0x80
+                    if leftovers then
+                        return string.char(char_1, char_2, char_3, leftovers)
                     end
-                    return string.char(c1, c2, c3)
-                elseif 0xD800 <= ucode and ucode < 0xDC00 then  -- surrogate pair 1st
-                    if f_str_surrogate_prev == 0 then
-                        f_str_surrogate_prev = ucode
-                        if not rest then
+                    return string.char(char_1, char_2, char_3)
+
+                elseif 0xD800 <= uni_code and uni_code < 0xDC00 then  -- surrogate pair 1st
+                    if formatted_preview == 0 then
+                        formatted_preview = uni_code
+                        if not leftovers then
                             return ''
                         end
-                        surrogate_first_error()
+                        reaper.ReaScriptError("! 1st surrogate pair byte not continued by 2nd")
                     end
-                    f_str_surrogate_prev = 0
-                    surrogate_first_error()
+
+                    formatted_preview = 0
+                    
+                    reaper.ReaScriptError("! 1st surrogate pair byte not continued by 2nd")
+
                 else  -- surrogate pair 2nd
-                    if f_str_surrogate_prev ~= 0 then
-                        ucode = 0x10000 +
-                                (f_str_surrogate_prev - 0xD800) * 0x400 +
-                                (ucode - 0xDC00)
-                        f_str_surrogate_prev = 0
-                        c1 = math.floor(ucode / 0x40000)
-                        ucode = ucode - c1 * 0x40000
-                        c2 = math.floor(ucode / 0x1000)
-                        ucode = ucode - c2 * 0x1000
-                        c3 = math.floor(ucode / 0x40)
-                        c4 = ucode - c3 * 0x40
-                        c1 = c1 + 0xF0
-                        c2 = c2 + 0x80
-                        c3 = c3 + 0x80
-                        c4 = c4 + 0x80
-                        if rest then
-                            return string.char(c1, c2, c3, c4, rest)
+                    if formatted_preview ~= 0 then
+                        uni_code = 0x10000 +
+                                (formatted_preview - 0xD800) * 0x400 +
+                                (uni_code - 0xDC00)
+                        formatted_preview = 0
+                        char_1 = math.floor(uni_code / 0x40000)
+                        uni_code = uni_code - char_1 * 0x40000
+                        char_2 = math.floor(uni_code / 0x1000)
+                        uni_code = uni_code - char_2 * 0x1000
+                        char_3 = math.floor(uni_code / 0x40)
+                        char_4 = uni_code - char_3 * 0x40
+                        char_1 = char_1 + 0xF0
+                        char_2 = char_2 + 0x80
+                        char_3 = char_3 + 0x80
+                        char_4 = char_4 + 0x80
+        
+                        if leftovers then
+                            return string.char(char_1, char_2, char_3, char_4, leftovers)
                         end
-                        return string.char(c1, c2, c3, c4)
+        
+                        return string.char(char_1, char_2, char_3, char_4)
                     end
+
                     reaper.ReaScriptError("! 2nd surrogate pair byte appeared without 1st")
                 end
             end
+            
             reaper.ReaScriptError("! Invalid unicode codepoint literal")
         end
-        if f_str_surrogate_prev ~= 0 then
-            f_str_surrogate_prev = 0
-            surrogate_first_error()
+
+        if formatted_preview ~= 0 then
+            formatted_preview = 0
+            
+            reaper.ReaScriptError("! 1st surrogate pair byte not continued by 2nd")
         end
-        return f_str_escapetbl[ch] .. ucode
+        
+        return escape_table[ch] .. uni_code
     end
 
 
@@ -312,8 +329,8 @@ function json.Decode(info, is_zero)
 
         if new_line:find('\\', 1, true) then  -- check whether a backslash exists
             new_line = new_line:gsub('\\(.)([^\\]?[^\\]?[^\\]?[^\\]?[^\\]?)', StringSubstitute)
-            if f_str_surrogate_prev ~= 0 then
-                f_str_surrogate_prev = 0
+            if formatted_preview ~= 0 then
+                formatted_preview = 0
                 reaper.ReaScriptError('! 1st surrogate pair byte not continued by 2nd (line #' .. GetLineNumber() .. '): ' .. line)
             end
         end
